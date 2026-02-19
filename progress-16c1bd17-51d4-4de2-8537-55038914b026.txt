@@ -108,3 +108,27 @@
 - Keep network retry behavior centralized in one request helper (`requestWithRetry`) so status-based retry rules stay consistent across endpoints.
 - For credentialed integrations, inject token refresh callbacks and token-updated hooks to decouple auth lifecycle from transport logic.
 - Export small pure utilities (`redact`, `parseRetryAfterMs`) and test them directly; this improves reliability of logging and retry behavior.
+
+## US-05 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from current local branch state.
+- Added inbound webhook controller at `src/channel/kakao/webhook.ts` with:
+  - HMAC SHA-256 signature verification (`x-kakao-signature`) with timing-safe comparison.
+  - Optional channel token guard (`x-kakao-channel-token`) when configured.
+  - JSON payload parsing with explicit 400 handling for malformed payloads.
+  - Mapping logic from Kakao inbound text message payloads to a normalized OpenClaw-style incoming message event shape.
+  - Safe ignore path for unhandled event/message types with debug logging.
+- Exported webhook module from `src/channel/kakao/index.ts`.
+- Added tests in `test/kakao-webhook.test.ts` covering:
+  - valid signed inbound text message -> canonical mapping + 200 response
+  - invalid signature -> 401 response
+  - unhandled event type -> ignored with debug log + 202 response
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-05 - Add inbound webhook endpoint for Kakao receive events`
+
+## Codebase Patterns (US-05 additions)
+- For webhook ingestion, keep HTTP concerns (signature/token verification + response status mapping) separate from payload normalization logic; this keeps parser tests fast and deterministic.
+- Normalize request header keys to lowercase once at boundary to avoid case-fragile signature/token checks.
+- Treat unknown inbound event types as non-fatal (2xx + debug log) to preserve webhook reliability while still surfacing integration gaps for operators.
