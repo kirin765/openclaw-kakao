@@ -1,0 +1,21 @@
+# Progress Log - Run 16c1bd17-51d4-4de2-8537-55038914b026
+
+## US-01 (completed)
+- Created new GitHub repository: https://github.com/kirin765/openclaw-kakao
+- Initialized Node + TypeScript baseline project on branch `feat/kakao-channel-plugin`
+- Added core project files: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `README.md`
+- Added quality/tooling config: `eslint.config.js`, `prettier.config.cjs`, `.editorconfig`, `.gitignore`
+- Added CI skeleton: `.github/workflows/ci.yml` with `pull_request` trigger and jobs for install/test/typecheck
+- Added bootstrap validation helper at `scripts/bootstrap.ts`
+- Added tests for bootstrap baseline checks at `test/bootstrap.test.ts`
+- Verified local checks:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+- Committed with message: `feat: US-01 - Create repository and baseline TypeScript project setup`
+
+## Codebase Patterns
+- Keep all baseline repository health checks available as npm scripts (`lint`, `test`, `typecheck`, `build`) to make CI and local usage identical.
+- Use a lightweight `scripts/` utility module for bootstrap or environment validation logic and cover it with unit tests under `test/`.
+- CI should explicitly separate install/test/typecheck stages for clear failure boundaries in PRs.
