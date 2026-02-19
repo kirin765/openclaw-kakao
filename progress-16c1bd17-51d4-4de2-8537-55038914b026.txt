@@ -233,3 +233,26 @@
 ## Codebase Patterns (US-09 additions)
 - For channel integration tests, compose webhook controller + provider action handler directly and inject mocked transport (`fetchImpl`) at client construction time; this validates boundary wiring without requiring real HTTP servers or third-party networks.
 - Assert both acceptance-path side effects (outbound request payload/headers) and rejection-path non-effects (no handler dispatch/no transport calls) to keep security validation and message flow guarantees together.
+
+## US-10 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Rewrote `README.md` with end-to-end installation and quickstart guidance from clone to first local send/receive verification.
+- Added full authentication and token operations guide at `docs/AUTH.md` covering:
+  - Kakao app/token provisioning flow
+  - channel token and webhook secret rotation playbooks
+  - secret handling best practices
+  - credential leak response checklist
+- Expanded troubleshooting documentation in README with 6 common failure signatures and explicit fixes.
+- Added documentation validation tests in `test/docs.test.ts` to verify:
+  - quickstart and troubleshooting coverage in README
+  - required auth/rotation/secret handling sections in `docs/AUTH.md`
+  - documentation-linked npm commands exist in `package.json` scripts
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-10 - Document installation, configuration, and usage`
+
+## Codebase Patterns (US-10 additions)
+- Treat docs as testable product surface: add unit tests that assert required operational sections and critical command references remain present.
+- Keep README focused on first-success path (clone -> configure -> run -> verify) and move deeper security/runbook guidance into dedicated docs (e.g., `docs/AUTH.md`) linked from README.
