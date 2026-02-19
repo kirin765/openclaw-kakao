@@ -77,3 +77,34 @@
 - Keep env validation deterministic by listing missing required keys in a fixed order; this prevents flaky tests and improves operator debugging.
 - Parse optional env values with trim-to-undefined semantics so blank strings behave like unset values.
 - Validate URL-like env vars early at config-load time (not at first network call) to fail fast with actionable messages.
+
+## US-04 (completed)
+- Implemented typed Kakao API client in `src/channel/kakao/client.ts`:
+  - Added `KakaoApiClient` with typed methods:
+    - `sendMessage(request: KakaoSendMessageRequest): Promise<KakaoSendMessageResponse>`
+    - `verifyWebhookSignature({ payload, signature }): boolean`
+  - Wired authorization/signing headers for Kakao API requests (`Authorization: Bearer ...`, `X-KakaoAK`, JSON content-type).
+  - Implemented retry/backoff behavior for transient failures:
+    - `401`: optional token refresh hook (`refreshChannelToken`) + update hook (`onChannelTokenUpdated`) and retry
+    - `429`: honors `Retry-After` header when present
+    - `5xx`: exponential backoff retry
+  - Added reusable helpers:
+    - `redact()` for safe logging output
+    - `parseRetryAfterMs()` for robust `Retry-After` parsing
+  - Updated `createKakaoClient` non-dry-run path to instantiate `KakaoApiClient` instead of throwing not-implemented.
+- Added tests in `test/kakao-api-client.test.ts` covering:
+  - Auth header wiring + typed send response path
+  - 401 refresh-and-retry token flow
+  - 429 + 5xx retry/backoff semantics
+  - Webhook signature verification helper
+  - Redacted logging behavior and retry utility helpers
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-04 - Implement Kakao API client with token/auth handling`
+
+## Codebase Patterns (US-04 additions)
+- Keep network retry behavior centralized in one request helper (`requestWithRetry`) so status-based retry rules stay consistent across endpoints.
+- For credentialed integrations, inject token refresh callbacks and token-updated hooks to decouple auth lifecycle from transport logic.
+- Export small pure utilities (`redact`, `parseRetryAfterMs`) and test them directly; this improves reliability of logging and retry behavior.
