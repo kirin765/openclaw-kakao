@@ -19,3 +19,32 @@
 - Keep all baseline repository health checks available as npm scripts (`lint`, `test`, `typecheck`, `build`) to make CI and local usage identical.
 - Use a lightweight `scripts/` utility module for bootstrap or environment validation logic and cover it with unit tests under `test/`.
 - CI should explicitly separate install/test/typecheck stages for clear failure boundaries in PRs.
+
+## US-02 (completed)
+- Pulled latest on `feat/kakao-channel-plugin` (already up to date).
+- Added Kakao channel scaffold under `src/channel/kakao/` with separated modules:
+  - `config.ts`: environment-based config loader with dry-run default
+  - `client.ts`: `KakaoClient` interface + `DryRunKakaoClient` implementation and inbound simulation hook for tests
+  - `handlers.ts`: message handler/context contracts and default ack handler
+  - `provider.ts`: `createKakaoChannelProvider` with boot/shutdown/send lifecycle methods and handler registration
+  - `index.ts`: barrel exports for channel module
+- Added plugin entrypoint in `src/plugin.ts`:
+  - `kakaoPluginManifest` (includes `channels: ['kakao']`)
+  - `createPlugin()` for channel registration and lifecycle hooks (`onLoad`, `onUnload`)
+  - default plugin export for loader discovery
+- Updated `src/index.ts` exports to include plugin and Kakao channel scaffold API.
+- Added scaffold tests in `test/kakao-scaffold.test.ts` covering:
+  - discoverable `kakao` channel provider export via plugin manifest
+  - dry-run boot/shutdown without external credentials
+  - inbound handler wiring through dry-run client simulation
+  - plugin lifecycle hook execution
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-02 - Scaffold OpenClaw Kakao channel plugin module`
+
+## Codebase Patterns (updated)
+- For new channel modules, keep a consistent split: `config` (env parsing), `client` (transport contract + implementation), `handlers` (message flow contract), `provider` (OpenClaw-facing lifecycle wrapper).
+- Make dry-run behavior default in early scaffolds so plugin boot can be validated in CI without external credentials.
+- Expose plugin manifest and lifecycle hooks from a dedicated `plugin.ts` entrypoint to keep loader discovery explicit and testable.
