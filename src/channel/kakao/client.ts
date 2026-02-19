@@ -31,8 +31,21 @@ export interface KakaoWebhookVerificationInput {
 export interface KakaoClient {
   start(): Promise<void>;
   stop(): Promise<void>;
-  send(message: OutboundMessage): Promise<void>;
+  send(message: OutboundMessage): Promise<KakaoSendMessageResponse>;
   onMessage(handler: (message: InboundMessage) => Promise<void> | void): void;
+}
+
+export class KakaoApiError extends Error {
+  public readonly status: number;
+
+  public readonly retryable: boolean;
+
+  public constructor(status: number, message: string, retryable: boolean) {
+    super(message);
+    this.name = 'KakaoApiError';
+    this.status = status;
+    this.retryable = retryable;
+  }
 }
 
 interface KakaoLogger {
@@ -164,8 +177,8 @@ export class KakaoApiClient implements KakaoClient {
     this.handler = handler;
   }
 
-  public async send(message: OutboundMessage): Promise<void> {
-    await this.sendMessage({ channelId: message.channelId, text: message.text });
+  public async send(message: OutboundMessage): Promise<KakaoSendMessageResponse> {
+    return this.sendMessage({ channelId: message.channelId, text: message.text });
   }
 
   public async sendMessage(request: KakaoSendMessageRequest): Promise<KakaoSendMessageResponse> {
@@ -229,7 +242,11 @@ export class KakaoApiClient implements KakaoClient {
           apiKey: redact(this.restApiKey),
           body: redact(errorText)
         });
-        throw new Error(`[kakao-api] request failed with status ${response.status}`);
+        throw new KakaoApiError(
+          response.status,
+          `[kakao-api] request failed with status ${response.status}`,
+          shouldRetryStatus(response.status)
+        );
       }
 
       if (response.status === 401 && this.refreshChannelToken) {
@@ -276,8 +293,11 @@ class DryRunKakaoClient implements KakaoClient {
     // no-op in dry-run mode
   }
 
-  public async send(_message: OutboundMessage): Promise<void> {
-    // no-op in dry-run mode
+  public async send(_message: OutboundMessage): Promise<KakaoSendMessageResponse> {
+    return {
+      success: true,
+      messageId: 'dry-run-message-id'
+    };
   }
 
   public onMessage(handler: (message: InboundMessage) => Promise<void> | void): void {
