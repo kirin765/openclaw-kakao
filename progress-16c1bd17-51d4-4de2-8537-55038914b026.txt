@@ -159,3 +159,29 @@
 - Keep provider-layer message action handling separate from low-level API transport errors; map transport errors into channel/action-specific error envelopes with `code`, `retryable`, and optional provider status.
 - Validate target addressing format before invoking external APIs to avoid unnecessary calls and to return deterministic non-retryable errors.
 - Return provider-native message identifiers from send actions in a normalized success payload so upstream orchestration can correlate deliveries.
+
+## US-07 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Implemented minimal injectable state layer at `src/channel/kakao/state.ts`:
+  - `KakaoChannelState` interface for event dedup + conversation mapping
+  - `InMemoryKakaoChannelState` default implementation
+  - deterministic key helper `toConversationKey`
+- Extended inbound webhook flow in `src/channel/kakao/webhook.ts`:
+  - injectable `state` option on controller factory
+  - deterministic duplicate-event ignore path using `event.id`
+  - conversation mapping resolution using `(channelId, userId)` with default `conversationId = "<channelId>:<userId>"`
+  - outgoing normalized event now includes `conversationId`
+- Exported state primitives via `src/channel/kakao/index.ts`.
+- Added tests:
+  - `test/kakao-webhook.test.ts`: duplicate event ignore behavior, injected-state conversation id reuse, existing mapping assertions updated for `conversationId`
+  - `test/kakao-state.test.ts`: in-memory dedup and mapping unit coverage
+- Updated README with documentation for deduplication + conversation mapping strategy and injection guidance.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+
+## Codebase Patterns (US-07 additions)
+- Keep webhook idempotency in a small injectable state contract so dedup behavior can be tested independently from transport and swapped to persistent backends later.
+- Resolve conversation identity at the ingestion boundary and attach `conversationId` to normalized events so downstream handlers avoid repeated lookup logic.
+- Use deterministic fallback conversation ids (`channelId:userId`) for local/dev reliability while allowing pre-seeded mappings via injected state.

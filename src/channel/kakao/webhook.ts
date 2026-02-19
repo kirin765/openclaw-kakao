@@ -1,5 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+import {
+  createDefaultKakaoChannelState,
+  type KakaoChannelState,
+  type KakaoConversationRef
+} from './state.js';
+
 export interface OpenClawIncomingMessageEvent {
   platform: 'kakao';
   channel: 'kakao';
@@ -7,6 +13,7 @@ export interface OpenClawIncomingMessageEvent {
   messageId: string;
   channelId: string;
   userId: string;
+  conversationId: string;
   text: string;
   raw: unknown;
 }
@@ -46,6 +53,7 @@ export interface CreateKakaoInboundWebhookControllerOptions {
   webhookSecret: string;
   channelToken?: string;
   logger?: KakaoWebhookLogger;
+  state?: KakaoChannelState;
   onIncomingMessage: (event: OpenClawIncomingMessageEvent) => Promise<void> | void;
 }
 
@@ -78,9 +86,11 @@ export const verifyKakaoWebhookSignature = (input: {
   return timingSafeEqual(expectedBuffer, actualBuffer);
 };
 
+type ParsedInboundMessage = Omit<OpenClawIncomingMessageEvent, 'conversationId'>;
+
 const toOpenClawIncomingMessage = (
   payload: KakaoInboundWebhookPayload
-): OpenClawIncomingMessageEvent | undefined => {
+): ParsedInboundMessage | undefined => {
   const event = payload.event;
   if (!event || event.type !== 'message' || event.message?.type !== 'text') {
     return undefined;
@@ -102,10 +112,25 @@ const toOpenClawIncomingMessage = (
   };
 };
 
+const resolveConversationId = (
+  state: KakaoChannelState,
+  ref: KakaoConversationRef
+): string => {
+  const existing = state.getConversationId(ref);
+  if (existing) {
+    return existing;
+  }
+
+  const created = `${ref.channelId}:${ref.userId}`;
+  state.setConversationId(ref, created);
+  return created;
+};
+
 export const createKakaoInboundWebhookController = (
   options: CreateKakaoInboundWebhookControllerOptions
 ): ((request: KakaoWebhookHttpRequest) => Promise<KakaoWebhookHttpResponse>) => {
   const logger = options.logger ?? defaultLogger;
+  const state = options.state ?? createDefaultKakaoChannelState();
 
   return async (request: KakaoWebhookHttpRequest): Promise<KakaoWebhookHttpResponse> => {
     const headers = normalizeHeaderMap(request.headers);
@@ -149,7 +174,23 @@ export const createKakaoInboundWebhookController = (
       return { status: 202, body: { ok: true } };
     }
 
-    await options.onIncomingMessage(incomingMessage);
+    if (state.hasProcessedEvent(incomingMessage.messageId)) {
+      logger.debug('[kakao-webhook] duplicate event ignored', {
+        messageId: incomingMessage.messageId
+      });
+      return { status: 202, body: { ok: true, reason: 'duplicate_event' } };
+    }
+
+    const conversationId = resolveConversationId(state, {
+      channelId: incomingMessage.channelId,
+      userId: incomingMessage.userId
+    });
+
+    state.markEventProcessed(incomingMessage.messageId);
+    await options.onIncomingMessage({
+      ...incomingMessage,
+      conversationId
+    });
     return { status: 200, body: { ok: true } };
   };
 };

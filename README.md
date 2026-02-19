@@ -25,6 +25,12 @@ npm run build
 - `npm run build` — compile TypeScript to `dist/`
 - `npm run format` / `npm run format:check` — run Prettier
 
-## Story status
+## Kakao inbound state strategy (US-07)
 
-This commit implements **US-01: repository + baseline TypeScript setup**.
+`createKakaoInboundWebhookController` uses an injectable `KakaoChannelState` for two reliability needs:
+
+- **Deduplication**: processed webhook `event.id` values are tracked via `hasProcessedEvent` / `markEventProcessed`; duplicate deliveries are ignored with `202` and `reason=duplicate_event`.
+- **Conversation mapping**: `(channelId, userId)` is mapped to `conversationId` via `getConversationId` / `setConversationId`.
+
+Default implementation is `InMemoryKakaoChannelState` in `src/channel/kakao/state.ts`.
+For production, replace with a persistent implementation (file/SQLite/DB) by injecting `state` into the webhook controller.
