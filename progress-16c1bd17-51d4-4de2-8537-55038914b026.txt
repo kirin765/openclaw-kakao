@@ -48,3 +48,32 @@
 - For new channel modules, keep a consistent split: `config` (env parsing), `client` (transport contract + implementation), `handlers` (message flow contract), `provider` (OpenClaw-facing lifecycle wrapper).
 - Make dry-run behavior default in early scaffolds so plugin boot can be validated in CI without external credentials.
 - Expose plugin manifest and lifecycle hooks from a dedicated `plugin.ts` entrypoint to keep loader discovery explicit and testable.
+
+## US-03 (completed)
+- Replaced Kakao config loader with a validated auth-focused schema in `src/channel/kakao/config.ts`.
+- Added required credential handling for non-dry-run mode:
+  - `KAKAO_REST_API_KEY`
+  - `KAKAO_WEBHOOK_SECRET`
+  - `KAKAO_CHANNEL_TOKEN`
+- Added deterministic startup error for missing required credentials in fixed key order.
+- Added optional endpoint overrides:
+  - `KAKAO_API_BASE_URL`
+  - `KAKAO_WEBHOOK_BASE_URL`
+  with strict `http(s)` URL validation and explicit error messages.
+- Added `.env.example` with every supported Kakao config variable.
+- Added config validation tests in `test/kakao-config.test.ts` to cover:
+  - dry-run defaults
+  - required credential enforcement in non-dry-run
+  - accepted valid credential set
+  - invalid optional endpoint formats
+  - valid optional endpoint formats
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-03 - Define configuration schema and secret loading for Kakao auth`
+
+## Codebase Patterns (US-03 additions)
+- Keep env validation deterministic by listing missing required keys in a fixed order; this prevents flaky tests and improves operator debugging.
+- Parse optional env values with trim-to-undefined semantics so blank strings behave like unset values.
+- Validate URL-like env vars early at config-load time (not at first network call) to fail fast with actionable messages.
