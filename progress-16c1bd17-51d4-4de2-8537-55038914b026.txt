@@ -210,3 +210,26 @@
 - For local integration examples, wrap runtime boot logic in an injectable factory (`env`, `providerFactory`) so tests can assert end-to-end wiring without real network/provider dependencies.
 - Provide a paired simulator script for webhook-driven channels; this gives developers a deterministic receive->send loop without requiring immediate third-party sandbox access.
 - Keep example env surface explicit in `.env.example` and README so `cp .env.example .env` is sufficient for first local run.
+
+## US-09 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Added end-to-end integration test suite at `test/kakao-integration-flow.test.ts` that simulates inbound Kakao webhook and validates outbound dispatch through plugin boundaries.
+- Covered happy-path flow:
+  - signed inbound text webhook payload accepted by webhook controller
+  - mapped event is forwarded through `onIncomingMessage`
+  - provider `sendMessageAction` dispatches through `KakaoApiClient`
+  - mocked HTTP transport captures outbound API request and returns provider message id
+- Covered auth/signature failure flow:
+  - invalid webhook signature returns `401 invalid_signature`
+  - inbound handler is not invoked
+  - outbound transport is not called
+- Ensured CI-safe/no external dependency by using injected mocked `fetchImpl` for all Kakao API interactions in integration tests.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-09 - Add end-to-end integration tests for basic Kakao channel flow`
+
+## Codebase Patterns (US-09 additions)
+- For channel integration tests, compose webhook controller + provider action handler directly and inject mocked transport (`fetchImpl`) at client construction time; this validates boundary wiring without requiring real HTTP servers or third-party networks.
+- Assert both acceptance-path side effects (outbound request payload/headers) and rejection-path non-effects (no handler dispatch/no transport calls) to keep security validation and message flow guarantees together.
