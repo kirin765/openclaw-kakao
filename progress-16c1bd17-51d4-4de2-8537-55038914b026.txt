@@ -185,3 +185,28 @@
 - Keep webhook idempotency in a small injectable state contract so dedup behavior can be tested independently from transport and swapped to persistent backends later.
 - Resolve conversation identity at the ingestion boundary and attach `conversationId` to normalized events so downstream handlers avoid repeated lookup logic.
 - Use deterministic fallback conversation ids (`channelId:userId`) for local/dev reliability while allowing pre-seeded mappings via injected state.
+
+## US-08 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Added local runnable Kakao echo example runtime at `src/example/echo.ts`:
+  - Starts HTTP server with `GET /healthz` and configurable webhook endpoint (`EXAMPLE_WEBHOOK_PATH`, default `/webhooks/kakao`).
+  - Validates signed Kakao webhook payloads using existing webhook controller.
+  - Demonstrates receive -> send echo flow by forwarding inbound text to provider outbound send as `echo: <text>`.
+  - Supports testability via injected env/provider factory.
+- Added developer scripts:
+  - `npm run dev:example` (`scripts/dev-example.ts`) to run local echo bot.
+  - `npm run example:simulate` (`scripts/example-simulate.ts`) to post signed sample webhook payloads locally.
+- Updated `.env.example` with local example defaults (`EXAMPLE_PORT`, `EXAMPLE_WEBHOOK_PATH`, sample ids/text) and dev webhook secret guidance.
+- Updated `README.md` with local example setup, usage, and webhook tunneling instructions (ngrok).
+- Added tests in `test/example-echo.test.ts` covering:
+  - Local webhook inbound event wiring to outbound echo send.
+  - Required env validation for webhook secret.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+
+## Codebase Patterns (US-08 additions)
+- For local integration examples, wrap runtime boot logic in an injectable factory (`env`, `providerFactory`) so tests can assert end-to-end wiring without real network/provider dependencies.
+- Provide a paired simulator script for webhook-driven channels; this gives developers a deterministic receive->send loop without requiring immediate third-party sandbox access.
+- Keep example env surface explicit in `.env.example` and README so `cp .env.example .env` is sufficient for first local run.

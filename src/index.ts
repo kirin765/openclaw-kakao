@@ -12,3 +12,4 @@ export const bootstrapInfo: ProjectBootstrapInfo = {
 
 export * from './plugin.js';
 export * from './channel/kakao/index.js';
+export * from './example/echo.js';
