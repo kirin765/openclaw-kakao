@@ -293,7 +293,9 @@ class DryRunKakaoClient implements KakaoClient {
     // no-op in dry-run mode
   }
 
-  public async send(_message: OutboundMessage): Promise<KakaoSendMessageResponse> {
+  public async send(message: OutboundMessage): Promise<KakaoSendMessageResponse> {
+    void message;
+
     return {
       success: true,
       messageId: 'dry-run-message-id'

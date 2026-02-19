@@ -13,7 +13,7 @@ const REQUIRED_NON_DRY_RUN_VARS = [
   'KAKAO_CHANNEL_TOKEN'
 ] as const;
 
-const OPTIONAL_URL_VARS = ['KAKAO_API_BASE_URL', 'KAKAO_WEBHOOK_BASE_URL'] as const;
+type OptionalUrlVar = 'KAKAO_API_BASE_URL' | 'KAKAO_WEBHOOK_BASE_URL';
 
 const readOptionalTrimmed = (value: string | undefined): string | undefined => {
   if (typeof value !== 'string') {
@@ -24,7 +24,7 @@ const readOptionalTrimmed = (value: string | undefined): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const assertValidUrl = (variableName: (typeof OPTIONAL_URL_VARS)[number], value: string): void => {
+const assertValidUrl = (variableName: OptionalUrlVar, value: string): void => {
   try {
     const parsed = new URL(value);
 

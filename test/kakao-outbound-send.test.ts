@@ -4,7 +4,6 @@ import {
   KakaoApiError,
   createKakaoChannelProvider,
   type KakaoClient,
-  type KakaoChannelConfig,
   type KakaoSendMessageResponse,
   KakaoSendActionError
 } from '../src/index.js';
@@ -31,7 +30,7 @@ describe('kakao outbound send flow', () => {
 
     const provider = createKakaoChannelProvider({
       env: { KAKAO_DRY_RUN: 'true' },
-      clientFactory: (_config: KakaoChannelConfig) => client
+      clientFactory: () => client
     });
 
     const result = await provider.sendMessageAction({

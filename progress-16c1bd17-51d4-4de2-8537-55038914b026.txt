@@ -256,3 +256,26 @@
 ## Codebase Patterns (US-10 additions)
 - Treat docs as testable product surface: add unit tests that assert required operational sections and critical command references remain present.
 - Keep README focused on first-success path (clone -> configure -> run -> verify) and move deeper security/runbook guidance into dedicated docs (e.g., `docs/AUTH.md`) linked from README.
+
+## US-11 (completed)
+- Fixed `origin` remote URL to target the correct repository (`kirin765/openclaw-kakao`) and pulled latest `feat/kakao-channel-plugin`.
+- Added release-quality PR artifacts:
+  - `.github/pull_request_template.md` with linked user stories, acceptance verification checklist, validation commands, risks, and rollback notes.
+  - `docs/PR_EVIDENCE.md` with local check evidence snippets, PR link, CI run link, risk review, and rollback plan.
+- Added PR-readiness tests in `test/pr-readiness.test.ts` to assert required PR template and evidence sections exist.
+- Resolved lint blockers uncovered during validation:
+  - removed/neutralized unused variables in `src/channel/kakao/client.ts`, `src/channel/kakao/config.ts`, and `test/kakao-outbound-send.test.ts`.
+- Opened/updated PR #1 against `main` with release summary and verification checklist:
+  - https://github.com/kirin765/openclaw-kakao/pull/1
+- Verified CI is green for PR head commit:
+  - https://github.com/kirin765/openclaw-kakao/actions/runs/22168468155
+- Validation run:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-11 - Prepare release-quality PR with checklist and evidence`
+
+## Codebase Patterns (US-11 additions)
+- Treat PR readiness as versioned artifacts (template + evidence doc) and enforce required sections via tests to prevent release checklist regressions.
+- Keep release evidence in-repo (`docs/PR_EVIDENCE.md`) with command snippets and CI links so reviewers can audit validations without searching chat logs.
