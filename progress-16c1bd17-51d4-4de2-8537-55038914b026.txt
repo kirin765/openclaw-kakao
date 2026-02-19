@@ -1,0 +1,290 @@
+# Progress Log - Run 16c1bd17-51d4-4de2-8537-55038914b026
+
+## US-01 (completed)
+- Created new GitHub repository: https://github.com/kirin765/openclaw-kakao
+- Initialized Node + TypeScript baseline project on branch `feat/kakao-channel-plugin`
+- Added core project files: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `README.md`
+- Added quality/tooling config: `eslint.config.js`, `prettier.config.cjs`, `.editorconfig`, `.gitignore`
+- Added CI skeleton: `.github/workflows/ci.yml` with `pull_request` trigger and jobs for install/test/typecheck
+- Added bootstrap validation helper at `scripts/bootstrap.ts`
+- Added tests for bootstrap baseline checks at `test/bootstrap.test.ts`
+- Verified local checks:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build`
+- Committed with message: `feat: US-01 - Create repository and baseline TypeScript project setup`
+
+## Codebase Patterns
+- Keep all baseline repository health checks available as npm scripts (`lint`, `test`, `typecheck`, `build`) to make CI and local usage identical.
+- Use a lightweight `scripts/` utility module for bootstrap or environment validation logic and cover it with unit tests under `test/`.
+- CI should explicitly separate install/test/typecheck stages for clear failure boundaries in PRs.
+
+## US-02 (completed)
+- Pulled latest on `feat/kakao-channel-plugin` (already up to date).
+- Added Kakao channel scaffold under `src/channel/kakao/` with separated modules:
+  - `config.ts`: environment-based config loader with dry-run default
+  - `client.ts`: `KakaoClient` interface + `DryRunKakaoClient` implementation and inbound simulation hook for tests
+  - `handlers.ts`: message handler/context contracts and default ack handler
+  - `provider.ts`: `createKakaoChannelProvider` with boot/shutdown/send lifecycle methods and handler registration
+  - `index.ts`: barrel exports for channel module
+- Added plugin entrypoint in `src/plugin.ts`:
+  - `kakaoPluginManifest` (includes `channels: ['kakao']`)
+  - `createPlugin()` for channel registration and lifecycle hooks (`onLoad`, `onUnload`)
+  - default plugin export for loader discovery
+- Updated `src/index.ts` exports to include plugin and Kakao channel scaffold API.
+- Added scaffold tests in `test/kakao-scaffold.test.ts` covering:
+  - discoverable `kakao` channel provider export via plugin manifest
+  - dry-run boot/shutdown without external credentials
+  - inbound handler wiring through dry-run client simulation
+  - plugin lifecycle hook execution
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-02 - Scaffold OpenClaw Kakao channel plugin module`
+
+## Codebase Patterns (updated)
+- For new channel modules, keep a consistent split: `config` (env parsing), `client` (transport contract + implementation), `handlers` (message flow contract), `provider` (OpenClaw-facing lifecycle wrapper).
+- Make dry-run behavior default in early scaffolds so plugin boot can be validated in CI without external credentials.
+- Expose plugin manifest and lifecycle hooks from a dedicated `plugin.ts` entrypoint to keep loader discovery explicit and testable.
+
+## US-03 (completed)
+- Replaced Kakao config loader with a validated auth-focused schema in `src/channel/kakao/config.ts`.
+- Added required credential handling for non-dry-run mode:
+  - `KAKAO_REST_API_KEY`
+  - `KAKAO_WEBHOOK_SECRET`
+  - `KAKAO_CHANNEL_TOKEN`
+- Added deterministic startup error for missing required credentials in fixed key order.
+- Added optional endpoint overrides:
+  - `KAKAO_API_BASE_URL`
+  - `KAKAO_WEBHOOK_BASE_URL`
+  with strict `http(s)` URL validation and explicit error messages.
+- Added `.env.example` with every supported Kakao config variable.
+- Added config validation tests in `test/kakao-config.test.ts` to cover:
+  - dry-run defaults
+  - required credential enforcement in non-dry-run
+  - accepted valid credential set
+  - invalid optional endpoint formats
+  - valid optional endpoint formats
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-03 - Define configuration schema and secret loading for Kakao auth`
+
+## Codebase Patterns (US-03 additions)
+- Keep env validation deterministic by listing missing required keys in a fixed order; this prevents flaky tests and improves operator debugging.
+- Parse optional env values with trim-to-undefined semantics so blank strings behave like unset values.
+- Validate URL-like env vars early at config-load time (not at first network call) to fail fast with actionable messages.
+
+## US-04 (completed)
+- Implemented typed Kakao API client in `src/channel/kakao/client.ts`:
+  - Added `KakaoApiClient` with typed methods:
+    - `sendMessage(request: KakaoSendMessageRequest): Promise<KakaoSendMessageResponse>`
+    - `verifyWebhookSignature({ payload, signature }): boolean`
+  - Wired authorization/signing headers for Kakao API requests (`Authorization: Bearer ...`, `X-KakaoAK`, JSON content-type).
+  - Implemented retry/backoff behavior for transient failures:
+    - `401`: optional token refresh hook (`refreshChannelToken`) + update hook (`onChannelTokenUpdated`) and retry
+    - `429`: honors `Retry-After` header when present
+    - `5xx`: exponential backoff retry
+  - Added reusable helpers:
+    - `redact()` for safe logging output
+    - `parseRetryAfterMs()` for robust `Retry-After` parsing
+  - Updated `createKakaoClient` non-dry-run path to instantiate `KakaoApiClient` instead of throwing not-implemented.
+- Added tests in `test/kakao-api-client.test.ts` covering:
+  - Auth header wiring + typed send response path
+  - 401 refresh-and-retry token flow
+  - 429 + 5xx retry/backoff semantics
+  - Webhook signature verification helper
+  - Redacted logging behavior and retry utility helpers
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-04 - Implement Kakao API client with token/auth handling`
+
+## Codebase Patterns (US-04 additions)
+- Keep network retry behavior centralized in one request helper (`requestWithRetry`) so status-based retry rules stay consistent across endpoints.
+- For credentialed integrations, inject token refresh callbacks and token-updated hooks to decouple auth lifecycle from transport logic.
+- Export small pure utilities (`redact`, `parseRetryAfterMs`) and test them directly; this improves reliability of logging and retry behavior.
+
+## US-05 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from current local branch state.
+- Added inbound webhook controller at `src/channel/kakao/webhook.ts` with:
+  - HMAC SHA-256 signature verification (`x-kakao-signature`) with timing-safe comparison.
+  - Optional channel token guard (`x-kakao-channel-token`) when configured.
+  - JSON payload parsing with explicit 400 handling for malformed payloads.
+  - Mapping logic from Kakao inbound text message payloads to a normalized OpenClaw-style incoming message event shape.
+  - Safe ignore path for unhandled event/message types with debug logging.
+- Exported webhook module from `src/channel/kakao/index.ts`.
+- Added tests in `test/kakao-webhook.test.ts` covering:
+  - valid signed inbound text message -> canonical mapping + 200 response
+  - invalid signature -> 401 response
+  - unhandled event type -> ignored with debug log + 202 response
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-05 - Add inbound webhook endpoint for Kakao receive events`
+
+## Codebase Patterns (US-05 additions)
+- For webhook ingestion, keep HTTP concerns (signature/token verification + response status mapping) separate from payload normalization logic; this keeps parser tests fast and deterministic.
+- Normalize request header keys to lowercase once at boundary to avoid case-fragile signature/token checks.
+- Treat unknown inbound event types as non-fatal (2xx + debug log) to preserve webhook reliability while still surfacing integration gaps for operators.
+
+## US-06 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Implemented outbound send flow for OpenClaw message action in `src/channel/kakao/provider.ts`:
+  - Added `sendMessageAction` handler that routes `channel=kakao` actions to Kakao client send API.
+  - Added target validation for `room:<id>` and `user:<id>` formats before API call.
+  - Added structured outbound error surface via `KakaoSendActionError` (`code`, `retryable`, `status`).
+  - Added success metadata return shape including provider message id (`providerMessageId`).
+- Updated Kakao client contract in `src/channel/kakao/client.ts`:
+  - `KakaoClient.send(...)` now returns `KakaoSendMessageResponse`.
+  - Introduced `KakaoApiError` with `status` and `retryable` for structured provider failures.
+  - Non-retry failure path now throws `KakaoApiError`.
+  - Dry-run client now returns deterministic message metadata (`dry-run-message-id`).
+- Added outbound send tests in `test/kakao-outbound-send.test.ts` covering:
+  - message action -> Kakao send invocation and provider metadata mapping
+  - preflight target format validation
+  - structured retry-friendly Kakao error mapping
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-06 - Implement outbound send flow via OpenClaw message action`
+
+## Codebase Patterns (US-06 additions)
+- Keep provider-layer message action handling separate from low-level API transport errors; map transport errors into channel/action-specific error envelopes with `code`, `retryable`, and optional provider status.
+- Validate target addressing format before invoking external APIs to avoid unnecessary calls and to return deterministic non-retryable errors.
+- Return provider-native message identifiers from send actions in a normalized success payload so upstream orchestration can correlate deliveries.
+
+## US-07 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Implemented minimal injectable state layer at `src/channel/kakao/state.ts`:
+  - `KakaoChannelState` interface for event dedup + conversation mapping
+  - `InMemoryKakaoChannelState` default implementation
+  - deterministic key helper `toConversationKey`
+- Extended inbound webhook flow in `src/channel/kakao/webhook.ts`:
+  - injectable `state` option on controller factory
+  - deterministic duplicate-event ignore path using `event.id`
+  - conversation mapping resolution using `(channelId, userId)` with default `conversationId = "<channelId>:<userId>"`
+  - outgoing normalized event now includes `conversationId`
+- Exported state primitives via `src/channel/kakao/index.ts`.
+- Added tests:
+  - `test/kakao-webhook.test.ts`: duplicate event ignore behavior, injected-state conversation id reuse, existing mapping assertions updated for `conversationId`
+  - `test/kakao-state.test.ts`: in-memory dedup and mapping unit coverage
+- Updated README with documentation for deduplication + conversation mapping strategy and injection guidance.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+
+## Codebase Patterns (US-07 additions)
+- Keep webhook idempotency in a small injectable state contract so dedup behavior can be tested independently from transport and swapped to persistent backends later.
+- Resolve conversation identity at the ingestion boundary and attach `conversationId` to normalized events so downstream handlers avoid repeated lookup logic.
+- Use deterministic fallback conversation ids (`channelId:userId`) for local/dev reliability while allowing pre-seeded mappings via injected state.
+
+## US-08 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Added local runnable Kakao echo example runtime at `src/example/echo.ts`:
+  - Starts HTTP server with `GET /healthz` and configurable webhook endpoint (`EXAMPLE_WEBHOOK_PATH`, default `/webhooks/kakao`).
+  - Validates signed Kakao webhook payloads using existing webhook controller.
+  - Demonstrates receive -> send echo flow by forwarding inbound text to provider outbound send as `echo: <text>`.
+  - Supports testability via injected env/provider factory.
+- Added developer scripts:
+  - `npm run dev:example` (`scripts/dev-example.ts`) to run local echo bot.
+  - `npm run example:simulate` (`scripts/example-simulate.ts`) to post signed sample webhook payloads locally.
+- Updated `.env.example` with local example defaults (`EXAMPLE_PORT`, `EXAMPLE_WEBHOOK_PATH`, sample ids/text) and dev webhook secret guidance.
+- Updated `README.md` with local example setup, usage, and webhook tunneling instructions (ngrok).
+- Added tests in `test/example-echo.test.ts` covering:
+  - Local webhook inbound event wiring to outbound echo send.
+  - Required env validation for webhook secret.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+
+## Codebase Patterns (US-08 additions)
+- For local integration examples, wrap runtime boot logic in an injectable factory (`env`, `providerFactory`) so tests can assert end-to-end wiring without real network/provider dependencies.
+- Provide a paired simulator script for webhook-driven channels; this gives developers a deterministic receive->send loop without requiring immediate third-party sandbox access.
+- Keep example env surface explicit in `.env.example` and README so `cp .env.example .env` is sufficient for first local run.
+
+## US-09 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Added end-to-end integration test suite at `test/kakao-integration-flow.test.ts` that simulates inbound Kakao webhook and validates outbound dispatch through plugin boundaries.
+- Covered happy-path flow:
+  - signed inbound text webhook payload accepted by webhook controller
+  - mapped event is forwarded through `onIncomingMessage`
+  - provider `sendMessageAction` dispatches through `KakaoApiClient`
+  - mocked HTTP transport captures outbound API request and returns provider message id
+- Covered auth/signature failure flow:
+  - invalid webhook signature returns `401 invalid_signature`
+  - inbound handler is not invoked
+  - outbound transport is not called
+- Ensured CI-safe/no external dependency by using injected mocked `fetchImpl` for all Kakao API interactions in integration tests.
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-09 - Add end-to-end integration tests for basic Kakao channel flow`
+
+## Codebase Patterns (US-09 additions)
+- For channel integration tests, compose webhook controller + provider action handler directly and inject mocked transport (`fetchImpl`) at client construction time; this validates boundary wiring without requiring real HTTP servers or third-party networks.
+- Assert both acceptance-path side effects (outbound request payload/headers) and rejection-path non-effects (no handler dispatch/no transport calls) to keep security validation and message flow guarantees together.
+
+## US-10 (completed)
+- Attempted `git pull --ff-only` on `feat/kakao-channel-plugin`; remote branch ref was unavailable in this environment, so work proceeded from local branch state.
+- Rewrote `README.md` with end-to-end installation and quickstart guidance from clone to first local send/receive verification.
+- Added full authentication and token operations guide at `docs/AUTH.md` covering:
+  - Kakao app/token provisioning flow
+  - channel token and webhook secret rotation playbooks
+  - secret handling best practices
+  - credential leak response checklist
+- Expanded troubleshooting documentation in README with 6 common failure signatures and explicit fixes.
+- Added documentation validation tests in `test/docs.test.ts` to verify:
+  - quickstart and troubleshooting coverage in README
+  - required auth/rotation/secret handling sections in `docs/AUTH.md`
+  - documentation-linked npm commands exist in `package.json` scripts
+- Validation run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-10 - Document installation, configuration, and usage`
+
+## Codebase Patterns (US-10 additions)
+- Treat docs as testable product surface: add unit tests that assert required operational sections and critical command references remain present.
+- Keep README focused on first-success path (clone -> configure -> run -> verify) and move deeper security/runbook guidance into dedicated docs (e.g., `docs/AUTH.md`) linked from README.
+
+## US-11 (completed)
+- Fixed `origin` remote URL to target the correct repository (`kirin765/openclaw-kakao`) and pulled latest `feat/kakao-channel-plugin`.
+- Added release-quality PR artifacts:
+  - `.github/pull_request_template.md` with linked user stories, acceptance verification checklist, validation commands, risks, and rollback notes.
+  - `docs/PR_EVIDENCE.md` with local check evidence snippets, PR link, CI run link, risk review, and rollback plan.
+- Added PR-readiness tests in `test/pr-readiness.test.ts` to assert required PR template and evidence sections exist.
+- Resolved lint blockers uncovered during validation:
+  - removed/neutralized unused variables in `src/channel/kakao/client.ts`, `src/channel/kakao/config.ts`, and `test/kakao-outbound-send.test.ts`.
+- Opened/updated PR #1 against `main` with release summary and verification checklist:
+  - https://github.com/kirin765/openclaw-kakao/pull/1
+- Verified CI is green for PR head commit:
+  - https://github.com/kirin765/openclaw-kakao/actions/runs/22168468155
+- Validation run:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Committed with message: `feat: US-11 - Prepare release-quality PR with checklist and evidence`
+
+## Codebase Patterns (US-11 additions)
+- Treat PR readiness as versioned artifacts (template + evidence doc) and enforce required sections via tests to prevent release checklist regressions.
+- Keep release evidence in-repo (`docs/PR_EVIDENCE.md`) with command snippets and CI links so reviewers can audit validations without searching chat logs.
+
+## US-11 verification rerun (completed)
+- Pulled latest `feat/kakao-channel-plugin` (`git pull --ff-only`) and confirmed branch is up to date.
+- Re-ran release validation suite to confirm PR readiness remains green:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Confirmed no additional code changes were required after validation rerun.
