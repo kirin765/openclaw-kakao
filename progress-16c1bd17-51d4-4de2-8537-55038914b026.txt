@@ -279,3 +279,12 @@
 ## Codebase Patterns (US-11 additions)
 - Treat PR readiness as versioned artifacts (template + evidence doc) and enforce required sections via tests to prevent release checklist regressions.
 - Keep release evidence in-repo (`docs/PR_EVIDENCE.md`) with command snippets and CI links so reviewers can audit validations without searching chat logs.
+
+## US-11 verification rerun (completed)
+- Pulled latest `feat/kakao-channel-plugin` (`git pull --ff-only`) and confirmed branch is up to date.
+- Re-ran release validation suite to confirm PR readiness remains green:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run test`
+- Confirmed no additional code changes were required after validation rerun.
